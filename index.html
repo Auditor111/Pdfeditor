@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartPDF — Intelligent PDF Editor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #15151a;
+    --surface2: #1c1c24;
+    --surface3: #242430;
+    --border: #2a2a38;
+    --border2: #353548;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --accent3: #38bdf8;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --text: #f0effe;
+    --text2: #a09dc0;
+    --text3: #5c5980;
+    --glow: rgba(108, 99, 255, 0.15);
+    --glow2: rgba(108, 99, 255, 0.08);
+    --radius: 10px;
+    --radius2: 16px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --shadow2: 0 8px 48px rgba(0,0,0,0.6);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 14px;
+  }
+
+  /* ─── TOPBAR ─────────────────────────────────── */
+  #topbar {
+    height: 58px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--text);
+    letter-spacing: -0.5px;
+    margin-right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .logo span { color: var(--accent2); }
+
+  .divider-v {
+    width: 1px; height: 24px;
+    background: var(--border);
+    margin: 0 6px;
+  }
+
+  .tb-btn {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text2);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex; align-items: center; gap: 7px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tb-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+  .tb-btn.active {
+    background: var(--glow);
+    color: var(--accent2);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset, 0 0 16px var(--glow);
+  }
+  .tb-btn.primary {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 600;
+  }
+  .tb-btn.primary:hover { opacity: 0.9; transform: translateY(-1px); }
+  .tb-btn svg { flex-shrink: 0; }
+  .tb-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+  #file-input { display: none; }
+
+  .tb-spacer { flex: 1; }
+
+  .page-nav {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text2);
+  }
+  .page-nav input {
+    width: 44px; height: 28px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px;
+    text-align: center; font-family: 'DM Sans', sans-serif; font-size: 13px;
+  }
+  .page-nav input:focus { outline: none; border-color: var(--accent); }
+
+  /* ─── MAIN LAYOUT ───────────────────────────── */
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ─── SIDEBAR ───────────────────────────────── */
+  #sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+    transition: width 0.2s;
+  }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .sidebar-section {
+    padding: 14px 12px 8px;
+  }
+  .sidebar-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+    color: var(--text3); text-transform: uppercase; margin-bottom: 8px;
+    padding: 0 4px;
+  }
+
+  #thumb-list {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 0 12px 12px;
+  }
+  .thumb-item {
+    border: 2px solid var(--border);
+    border-radius: 8px; cursor: pointer; overflow: hidden;
+    transition: all 0.15s; background: var(--surface2);
+    position: relative;
+  }
+  .thumb-item:hover { border-color: var(--border2); }
+  .thumb-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .thumb-item canvas { display: block; width: 100%; }
+  .thumb-num {
+    position: absolute; bottom: 4px; right: 6px;
+    font-size: 10px; color: var(--text3); font-weight: 600;
+    background: var(--bg); padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* ─── CANVAS AREA ───────────────────────────── */
+  #canvas-area {
+    flex: 1;
+    overflow: auto;
+    background: #1a1a22;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 24px;
+    position: relative;
+  }
+  #canvas-area::-webkit-scrollbar { width: 8px; height: 8px; }
+  #canvas-area::-webkit-scrollbar-track { background: var(--bg); }
+  #canvas-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  #page-wrapper {
+    position: relative;
+    display: inline-block;
+    box-shadow: var(--shadow2);
+    border-radius: 4px;
+    overflow: visible;
+  }
+
+  #pdf-canvas {
+    display: block;
+    border-radius: 4px;
+  }
+
+  #overlay {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #overlay.edit-mode { pointer-events: all; }
+
+  .text-block {
+    position: absolute;
+    cursor: text;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    transition: border-color 0.12s, background 0.12s;
+    box-sizing: border-box;
+    line-height: 1.2;
+    white-space: pre;
+    overflow: hidden;
+    outline: none;
+  }
+  .text-block:hover {
+    border-color: rgba(108,99,255,0.6);
+    background: rgba(108,99,255,0.05);
+  }
+  .text-block.editing {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.08);
+    outline: none;
+    white-space: pre-wrap;
+    overflow: visible;
+    z-index: 10;
+    box-shadow: 0 0 0 2px rgba(108,99,255,0.3);
+  }
+  .text-block.highlighted {
+    background: rgba(251,191,36,0.25);
+    border-color: var(--warning);
+  }
+  .text-block.replaced {
+    background: rgba(52,211,153,0.2);
+    border-color: var(--success);
+  }
+
+  /* ─── RIGHT PANEL ───────────────────────────── */
+  #right-panel {
+    width: 280px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    transition: transform 0.2s;
+  }
+  #right-panel::-webkit-scrollbar { width: 4px; }
+  #right-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .panel-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.2px;
+    color: var(--text2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-header .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .panel-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-section-title {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px;
+    color: var(--text3); text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  .field-group { margin-bottom: 10px; }
+  .field-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; display: block; }
+  .field-input {
+    width: 100%; height: 32px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 7px;
+    padding: 0 10px; font-family: 'DM Sans', sans-serif; font-size: 13px;
+    transition: border-color 0.15s;
+  }
+  .field-input:focus { outline: none; border-color: var(--accent); }
+
+  .field-row { display: flex; gap: 8px; }
+  .field-row .field-group { flex: 1; }
+
+  .panel-btn {
+    width: 100%; height: 34px;
+    border-radius: 8px; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .panel-btn.accent {
+    background: linear-gradient(135deg, var(--accent), #8b5cf6);
+    color: #fff;
+  }
+  .panel-btn.accent:hover { opacity: 0.85; transform: translateY(-1px); }
+  .panel-btn.ghost {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text2);
+  }
+  .panel-btn.ghost:hover { border-color: var(--border2); color: var(--text); }
+  .panel-btn + .panel-btn { margin-top: 8px; }
+
+  .match-count {
+    font-size: 11px; color: var(--text3); margin-top: 6px; text-align: center;
+  }
+  .match-count span { color: var(--accent2); font-weight: 600; }
+
+  /* Table editor */
+  #table-editor-wrap {
+    padding: 12px 16px;
+  }
+  #table-grid {
+    border-collapse: collapse; width: 100%;
+    font-size: 11px;
+  }
+  #table-grid td {
+    border: 1px solid var(--border2);
+    padding: 4px 6px;
+    background: var(--surface2);
+    color: var(--text);
+    min-width: 40px;
+    outline: none;
+    vertical-align: top;
+  }
+  #table-grid td:focus {
+    background: var(--surface3);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .table-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .table-actions .panel-btn { flex: 1; height: 28px; font-size: 11px; }
+
+  /* ─── PROPS ─────────────────────────────────── */
+  .prop-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .prop-row label { font-size: 11px; color: var(--text3); flex: 1; }
+  .prop-row input[type=number] {
+    width: 60px; height: 28px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px;
+    padding: 0 8px; font-size: 12px; font-family: 'DM Sans', sans-serif;
+  }
+  .prop-row input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .prop-row select {
+    flex: 1; height: 28px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px;
+    padding: 0 6px; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    appearance: none;
+  }
+  .prop-row select:focus { outline: none; border-color: var(--accent); }
+
+  /* ─── STATUS BAR ─────────────────────────────── */
+  #statusbar {
+    height: 26px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 16px; gap: 16px;
+    font-size: 11px; color: var(--text3);
+    flex-shrink: 0;
+  }
+  .status-item { display: flex; align-items: center; gap: 5px; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text3); }
+  .status-dot.active { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ─── DROP OVERLAY ───────────────────────────── */
+  #drop-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 50;
+  }
+  #drop-zone.hidden { display: none; }
+
+  .drop-card {
+    background: var(--surface);
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius2);
+    padding: 48px 56px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    max-width: 420px;
+  }
+  .drop-card:hover, .drop-card.drag-over {
+    border-color: var(--accent);
+    background: var(--glow2);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow2), 0 0 40px var(--glow);
+  }
+  .drop-icon {
+    width: 64px; height: 64px;
+    background: var(--glow);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 28px;
+  }
+  .drop-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 20px;
+    color: var(--text); margin-bottom: 6px;
+  }
+  .drop-sub {
+    font-size: 13px; color: var(--text3); line-height: 1.5;
+  }
+  .drop-sub strong { color: var(--accent2); }
+
+  /* ─── LOADING ────────────────────────────────── */
+  #loading-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    width: 0%;
+    transition: width 0.3s ease;
+    z-index: 9999;
+    border-radius: 0 3px 3px 0;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* ─── TOAST ──────────────────────────────────── */
+  #toast {
+    position: fixed;
+    bottom: 40px; right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px; color: var(--text);
+    box-shadow: var(--shadow2);
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 9999;
+    display: flex; align-items: center; gap: 8px;
+    max-width: 300px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--success); }
+  #toast.error { border-color: var(--danger); }
+
+  /* ─── MODAL ──────────────────────────────────── */
+  #modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  #modal-backdrop.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius2);
+    padding: 28px;
+    width: 400px;
+    box-shadow: var(--shadow2);
+    transform: scale(0.95);
+    transition: transform 0.2s;
+  }
+  #modal-backdrop.open .modal { transform: scale(1); }
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 17px; margin-bottom: 16px;
+  }
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+  .modal-actions .panel-btn { width: auto; padding: 0 18px; }
+
+  /* Progress ring */
+  .progress-wrap {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 14px; padding: 8px 0;
+  }
+  .progress-ring { transform: rotate(-90deg); }
+  .progress-ring circle { transition: stroke-dashoffset 0.4s ease; }
+  .progress-label {
+    font-size: 13px; color: var(--text2); text-align: center; line-height: 1.5;
+  }
+
+  /* Zoom */
+  .zoom-controls {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .zoom-btn {
+    width: 26px; height: 26px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); border-radius: 6px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.12s;
+  }
+  .zoom-btn:hover { border-color: var(--border2); color: var(--text); }
+  .zoom-val {
+    font-size: 11px; color: var(--text3); min-width: 36px; text-align: center;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* OCR badge */
+  .ocr-badge {
+    position: absolute; top: 6px; left: 6px;
+    background: var(--warning);
+    color: #000; font-size: 9px; font-weight: 700;
+    padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px;
+    pointer-events: none; text-transform: uppercase;
+  }
+
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .animate-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    #sidebar { display: none; }
+    #right-panel { width: 240px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-icon">✦</div>
+    Smart<span>PDF</span>
+  </div>
+
+  <div class="divider-v"></div>
+
+  <label class="tb-btn primary" for="file-input">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    Upload PDF
+  </label>
+  <input type="file" id="file-input" accept=".pdf">
+
+  <div class="divider-v"></div>
+
+  <button class="tb-btn" id="btn-edit" title="Edit Text (E)" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Edit Text
+  </button>
+
+  <button class="tb-btn" id="btn-replace" title="Find & Replace (R)" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
+    Find & Replace
+  </button>
+
+  <button class="tb-btn" id="btn-table" title="Detect Tables" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    Tables
+  </button>
+
+  <button class="tb-btn" id="btn-ocr" title="Run OCR on scanned PDF" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    OCR
+  </button>
+
+  <div class="tb-spacer"></div>
+
+  <div class="zoom-controls">
+    <button class="zoom-btn" id="zoom-out">−</button>
+    <span class="zoom-val" id="zoom-val">100%</span>
+    <button class="zoom-btn" id="zoom-in">+</button>
+  </div>
+
+  <div class="divider-v"></div>
+
+  <div class="page-nav">
+    <button class="zoom-btn" id="prev-page">‹</button>
+    <input type="number" id="page-input" value="1" min="1">
+    <span>/ <span id="page-total">—</span></span>
+    <button class="zoom-btn" id="next-page">›</button>
+  </div>
+
+  <div class="divider-v"></div>
+
+  <button class="tb-btn primary" id="btn-download" disabled>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+    Export PDF
+  </button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Pages</div>
+    </div>
+    <div id="thumb-list"></div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-area">
+    <div id="drop-zone">
+      <div class="drop-card" id="drop-card">
+        <div class="drop-icon">⬆</div>
+        <div class="drop-title">Drop your PDF here</div>
+        <div class="drop-sub">or <strong>click Upload</strong> in the toolbar<br>Supports text PDFs and scanned documents</div>
+      </div>
+    </div>
+
+    <div id="page-wrapper" style="display:none">
+      <canvas id="pdf-canvas"></canvas>
+      <div id="overlay"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div class="panel-header">
+      <div class="dot"></div>
+      Properties
+    </div>
+
+    <!-- TEXT PROPS -->
+    <div class="panel-section" id="text-props" style="display:none">
+      <div class="panel-section-title">Selected Text</div>
+      <div class="prop-row">
+        <label>Font Size</label>
+        <input type="number" id="prop-size" value="12" min="4" max="144" step="0.5">
+      </div>
+      <div class="prop-row">
+        <label>Alignment</label>
+        <select id="prop-align">
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+      <div class="prop-row">
+        <label>Color</label>
+        <input type="color" id="prop-color" value="#000000"
+          style="width:36px;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);cursor:pointer;padding:2px 3px;">
+      </div>
+    </div>
+
+    <!-- FIND & REPLACE -->
+    <div class="panel-section" id="fr-panel">
+      <div class="panel-section-title">Find & Replace</div>
+      <div class="field-group">
+        <label class="field-label">Find</label>
+        <input class="field-input" type="text" id="fr-find" placeholder="Search text…">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Replace with</label>
+        <input class="field-input" type="text" id="fr-replace" placeholder="Replacement…">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="fr-case" style="accent-color:var(--accent)"> Case sensitive
+      </label>
+      <button class="panel-btn ghost" id="fr-find-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        Find All
+      </button>
+      <button class="panel-btn accent" id="fr-replace-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        Replace All
+      </button>
+      <div class="match-count" id="match-count"></div>
+    </div>
+
+    <!-- TABLE EDITOR -->
+    <div class="panel-section" id="table-panel" style="display:none">
+      <div class="panel-section-title">Table Editor</div>
+      <div id="table-editor-wrap">
+        <table id="table-grid"></table>
+        <div class="table-actions">
+          <button class="panel-btn ghost" id="tbl-add-row">+ Row</button>
+          <button class="panel-btn ghost" id="tbl-add-col">+ Col</button>
+          <button class="panel-btn accent" id="tbl-apply">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- OCR PANEL -->
+    <div class="panel-section" id="ocr-panel" style="display:none">
+      <div class="panel-section-title">OCR Engine</div>
+      <div class="progress-wrap" id="ocr-progress-wrap" style="display:none">
+        <svg class="progress-ring" width="64" height="64">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="4"/>
+          <circle id="ocr-ring" cx="32" cy="32" r="26" fill="none"
+            stroke="var(--accent)" stroke-width="4"
+            stroke-dasharray="163" stroke-dashoffset="163"/>
+        </svg>
+        <div class="progress-label" id="ocr-status">Initializing…</div>
+      </div>
+      <p style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:10px">
+        For scanned / image-based PDFs, OCR will extract text and create editable overlays.
+      </p>
+      <button class="panel-btn accent" id="ocr-run-btn">
+        Run OCR on This Page
+      </button>
+    </div>
+
+    <!-- DOC INFO -->
+    <div class="panel-section" id="doc-info">
+      <div class="panel-section-title">Document</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text3)">Pages</span>
+          <span style="font-size:11px;color:var(--text2)" id="info-pages">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text3)">Text Blocks</span>
+          <span style="font-size:11px;color:var(--text2)" id="info-blocks">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text3)">File Size</span>
+          <span style="font-size:11px;color:var(--text2)" id="info-size">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:11px;color:var(--text3)">Mode</span>
+          <span style="font-size:11px" id="info-mode" style="color:var(--text3)">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="status-item">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">No document loaded</span>
+  </div>
+  <div style="flex:1"></div>
+  <div class="status-item" id="cursor-pos" style="display:none">
+    <span id="status-pos">—</span>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL (Export Progress) -->
+<div id="modal-backdrop">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Exporting PDF…</div>
+    <div id="modal-body">
+      <div class="progress-wrap">
+        <div id="export-progress-text" style="font-size:13px;color:var(--text2);text-align:center;line-height:1.7"></div>
+      </div>
+    </div>
+    <div class="modal-actions" id="modal-actions" style="display:none">
+      <button class="panel-btn ghost" id="modal-close">Close</button>
+      <button class="panel-btn accent" id="modal-download-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Download
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  SMART PDF EDITOR — Core Application
+// ═══════════════════════════════════════════════════════
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ──────────────────────────────────────────
+const state = {
+  pdfDoc: null,
+  pdfLibDoc: null,
+  pdfBytes: null,
+  currentPage: 1,
+  totalPages: 0,
+  scale: 1.5,
+  editMode: false,
+  textBlocks: {},     // pageNum -> [{el, orig, x, y, w, h, fontSize, align, color}]
+  tableData: null,
+  selectedBlock: null,
+  ocrMode: false,
+  fileName: 'edited.pdf',
+  exportBytes: null,
+};
+
+// ─── DOM refs ───────────────────────────────────────
+const $  = id => document.getElementById(id);
+const canvas       = $('pdf-canvas');
+const ctx          = canvas.getContext('2d');
+const overlay      = $('overlay');
+const dropZone     = $('drop-zone');
+const pageWrapper  = $('page-wrapper');
+
+// ─── Utilities ──────────────────────────────────────
+function setLoadingBar(pct) {
+  $('loading-bar').style.width = pct + '%';
+  if (pct >= 100) setTimeout(() => $('loading-bar').style.width = '0%', 400);
+}
+
+function showToast(msg, type='info', dur=3000) {
+  const t = $('toast');
+  const icons = { success:'✓', error:'✕', info:'ℹ', warning:'⚠' };
+  t.className = `show ${type}`;
+  t.textContent = (icons[type]||'') + ' ' + msg;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', dur);
+}
+
+function setStatus(text, loading=false) {
+  $('status-text').textContent = text;
+  $('status-dot').className = 'status-dot' + (loading ? ' loading' : ' active');
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(2) + ' MB';
+}
+
+function updateInfo() {
+  $('info-pages').textContent  = state.totalPages;
+  $('info-blocks').textContent = (state.textBlocks[state.currentPage] || []).length;
+  $('info-size').textContent   = state.pdfBytes ? formatBytes(state.pdfBytes.length) : '—';
+  $('info-mode').textContent   = state.ocrMode ? '🔍 OCR' : '📄 Native';
+  $('info-mode').style.color   = state.ocrMode ? 'var(--warning)' : 'var(--success)';
+}
+
+// ─── PDF Loading ─────────────────────────────────────
+async function loadPDF(buffer, name) {
+  try {
+    setStatus('Loading PDF…', true);
+    setLoadingBar(20);
+
+    state.pdfBytes   = new Uint8Array(buffer);
+    state.fileName   = name.replace(/\.pdf$/i, '') + '-edited.pdf';
+
+    // pdf.js for render
+    const loadTask   = pdfjsLib.getDocument({ data: state.pdfBytes });
+    state.pdfDoc     = await loadTask.promise;
+    state.totalPages = state.pdfDoc.numPages;
+    state.textBlocks = {};
+
+    setLoadingBar(50);
+
+    // pdf-lib for editing
+    state.pdfLibDoc  = await PDFLib.PDFDocument.load(state.pdfBytes, { ignoreEncryption: true });
+
+    setLoadingBar(70);
+
+    $('page-total').textContent = state.totalPages;
+    $('page-input').max = state.totalPages;
+    $('info-pages').textContent = state.totalPages;
+    $('info-size').textContent  = formatBytes(state.pdfBytes.length);
+
+    // Enable buttons
+    ['btn-edit','btn-replace','btn-table','btn-ocr','btn-download'].forEach(id => {
+      $(id).disabled = false;
+    });
+
+    // Build thumbnails
+    await buildThumbs();
+
+    dropZone.classList.add('hidden');
+    pageWrapper.style.display = 'inline-block';
+
+    state.currentPage = 1;
+    await renderPage(1);
+
+    setLoadingBar(100);
+    setStatus(`Loaded: ${name}`, false);
+    showToast('PDF loaded successfully', 'success');
+    updateInfo();
+  } catch(err) {
+    setStatus('Error loading PDF');
+    showToast('Failed to load PDF: ' + err.message, 'error', 5000);
+    console.error(err);
+  }
+}
+
+async function buildThumbs() {
+  const list = $('thumb-list');
+  list.innerHTML = '';
+  for (let i = 1; i <= state.totalPages; i++) {
+    const page = await state.pdfDoc.getPage(i);
+    const vp   = page.getViewport({ scale: 0.18 });
+    const c    = document.createElement('canvas');
+    c.width    = vp.width;
+    c.height   = vp.height;
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    const item = document.createElement('div');
+    item.className = 'thumb-item';
+    item.dataset.page = i;
+    item.appendChild(c);
+    const num = document.createElement('div');
+    num.className = 'thumb-num';
+    num.textContent = i;
+    item.appendChild(num);
+    item.addEventListener('click', () => gotoPage(i));
+    list.appendChild(item);
+  }
+}
+
+function updateThumbActive() {
+  document.querySelectorAll('.thumb-item').forEach(el => {
+    el.classList.toggle('active', +el.dataset.page === state.currentPage);
+    if (+el.dataset.page === state.currentPage) {
+      el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
+  });
+}
+
+// ─── Page Rendering ──────────────────────────────────
+async function renderPage(pageNum) {
+  setStatus(`Rendering page ${pageNum}…`, true);
+  overlay.innerHTML = '';
+  state.selectedBlock = null;
+  $('text-props').style.display = 'none';
+
+  const page = await state.pdfDoc.getPage(pageNum);
+  const vp   = page.getViewport({ scale: state.scale });
+
+  canvas.width  = vp.width;
+  canvas.height = vp.height;
+  overlay.style.width  = vp.width + 'px';
+  overlay.style.height = vp.height + 'px';
+
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+  // Extract text if not cached
+  if (!state.textBlocks[pageNum]) {
+    await extractTextBlocks(page, vp, pageNum);
+  } else {
+    // Re-render cached blocks
+    renderOverlayBlocks(pageNum);
+  }
+
+  updateThumbActive();
+  $('page-input').value = pageNum;
+  setStatus(`Page ${pageNum} of ${state.totalPages}`, false);
+  updateInfo();
+}
+
+async function extractTextBlocks(page, vp, pageNum) {
+  const content   = await page.getTextContent({ includeMarkedContent: false });
+  const transform = vp.transform;
+  state.textBlocks[pageNum] = [];
+
+  // Group items into lines by y-coordinate proximity
+  const items = content.items.filter(it => it.str && it.str.trim().length > 0);
+
+  items.forEach(item => {
+    // pdf.js transform: [scaleX, skewX, skewY, scaleY, tx, ty]
+    const t = item.transform;
+    const x = t[4] * (vp.scale / page.getViewport({ scale:1 }).transform[0]);
+    const y = t[5];
+
+    // Convert PDF coords to canvas coords
+    const [cx, cy] = applyTransform(t, vp);
+    const fontSize = Math.abs(t[0] || t[3] || item.height || 10) * state.scale;
+    const width    = (item.width  || 100) * state.scale;
+    const height   = Math.max(fontSize * 1.2, 10);
+
+    const block = {
+      orig: item.str,
+      current: item.str,
+      x: cx,
+      y: cy - height * 0.85,
+      w: Math.max(width, 20),
+      h: height,
+      fontSize: Math.max(fontSize, 6),
+      align: 'left',
+      color: '#000000',
+      el: null,
+      modified: false,
+    };
+    state.textBlocks[pageNum].push(block);
+  });
+
+  renderOverlayBlocks(pageNum);
+}
+
+function applyTransform(t, vp) {
+  // pdf.js viewport transform
+  const [a,b,c,d,e,f] = vp.transform;
+  const x = t[4]; const y = t[5];
+  const cx = a*x + c*y + e;
+  const cy = b*x + d*y + f;
+  return [cx, cy];
+}
+
+function renderOverlayBlocks(pageNum) {
+  overlay.innerHTML = '';
+  const blocks = state.textBlocks[pageNum] || [];
+  blocks.forEach((block, idx) => {
+    const el = document.createElement('div');
+    el.className = 'text-block';
+    el.contentEditable = state.editMode ? 'true' : 'false';
+    el.textContent = block.current;
+    el.style.cssText = `
+      left:${block.x}px; top:${block.y}px;
+      width:${block.w}px; min-height:${block.h}px;
+      font-size:${block.fontSize}px;
+      text-align:${block.align};
+      color:${block.color};
+      font-family: Arial, sans-serif;
+      padding: 0 1px;
+      pointer-events: ${state.editMode ? 'all' : 'none'};
+    `;
+
+    el.addEventListener('click', () => selectBlock(block, el, pageNum, idx));
+    el.addEventListener('input', () => {
+      block.current = el.textContent;
+      block.modified = true;
+      updateInfo();
+    });
+    el.addEventListener('focus', () => {
+      el.classList.add('editing');
+      selectBlock(block, el, pageNum, idx);
+    });
+    el.addEventListener('blur', () => el.classList.remove('editing'));
+
+    overlay.appendChild(el);
+    block.el = el;
+  });
+  updateInfo();
+}
+
+function selectBlock(block, el, pageNum, idx) {
+  state.selectedBlock = block;
+  $('text-props').style.display = 'block';
+  $('prop-size').value    = Math.round(block.fontSize / state.scale * 10) / 10;
+  $('prop-align').value   = block.align;
+  $('prop-color').value   = block.color;
+}
+
+// ─── Edit Mode ───────────────────────────────────────
+$('btn-edit').addEventListener('click', () => {
+  state.editMode = !state.editMode;
+  $('btn-edit').classList.toggle('active', state.editMode);
+  overlay.classList.toggle('edit-mode', state.editMode);
+  const blocks = state.textBlocks[state.currentPage] || [];
+  blocks.forEach(b => {
+    if (b.el) {
+      b.el.contentEditable = state.editMode ? 'true' : 'false';
+      b.el.style.pointerEvents = state.editMode ? 'all' : 'none';
+    }
+  });
+  showToast(state.editMode ? 'Edit mode ON — click any text to edit' : 'Edit mode OFF', 'info', 2000);
+  setStatus(state.editMode ? 'Edit mode active' : `Page ${state.currentPage} of ${state.totalPages}`);
+});
+
+// ─── Properties Panel ────────────────────────────────
+$('prop-size').addEventListener('input', () => {
+  if (!state.selectedBlock) return;
+  const sz = parseFloat($('prop-size').value) * state.scale;
+  state.selectedBlock.fontSize = sz;
+  if (state.selectedBlock.el) state.selectedBlock.el.style.fontSize = sz + 'px';
+});
+$('prop-align').addEventListener('change', () => {
+  if (!state.selectedBlock) return;
+  state.selectedBlock.align = $('prop-align').value;
+  if (state.selectedBlock.el) state.selectedBlock.el.style.textAlign = $('prop-align').value;
+});
+$('prop-color').addEventListener('input', () => {
+  if (!state.selectedBlock) return;
+  state.selectedBlock.color = $('prop-color').value;
+  if (state.selectedBlock.el) state.selectedBlock.el.style.color = $('prop-color').value;
+});
+
+// ─── Find & Replace ──────────────────────────────────
+$('btn-replace').addEventListener('click', () => {
+  $('fr-find').focus();
+  showToast('Use the Find & Replace panel →', 'info', 2000);
+});
+
+$('fr-find-btn').addEventListener('click', () => findAll());
+$('fr-find').addEventListener('keydown', e => { if(e.key==='Enter') findAll(); });
+
+let matchResults = [];
+
+function findAll() {
+  const query    = $('fr-find').value.trim();
+  const caseSens = $('fr-case').checked;
+  matchResults   = [];
+  $('match-count').innerHTML = '';
+
+  // Clear previous highlights
+  document.querySelectorAll('.text-block.highlighted').forEach(el => el.classList.remove('highlighted'));
+
+  if (!query || !state.pdfDoc) return;
+
+  Object.keys(state.textBlocks).forEach(pg => {
+    state.textBlocks[pg].forEach((block, idx) => {
+      const text = caseSens ? block.current : block.current.toLowerCase();
+      const q    = caseSens ? query : query.toLowerCase();
+      if (text.includes(q)) {
+        matchResults.push({ pg: +pg, block, idx });
+        if (+pg === state.currentPage && block.el) {
+          block.el.classList.add('highlighted');
+        }
+      }
+    });
+  });
+
+  const pages = [...new Set(matchResults.map(m => m.pg))];
+  $('match-count').innerHTML =
+    `Found <span>${matchResults.length}</span> match${matchResults.length!==1?'es':''} across <span>${pages.length}</span> page${pages.length!==1?'s':''}`;
+  showToast(`${matchResults.length} matches found`, matchResults.length ? 'success' : 'warning', 2500);
+}
+
+$('fr-replace-btn').addEventListener('click', () => {
+  const query    = $('fr-find').value.trim();
+  const replace  = $('fr-replace').value;
+  const caseSens = $('fr-case').checked;
+  if (!query || !state.pdfDoc) return;
+
+  let count = 0;
+  Object.keys(state.textBlocks).forEach(pg => {
+    state.textBlocks[pg].forEach(block => {
+      const flags = caseSens ? 'g' : 'gi';
+      const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+      if (regex.test(block.current)) {
+        block.current = block.current.replace(regex, replace);
+        block.modified = true;
+        count++;
+        if (+pg === state.currentPage && block.el) {
+          block.el.textContent = block.current;
+          block.el.classList.remove('highlighted');
+          block.el.classList.add('replaced');
+          setTimeout(() => block.el?.classList.remove('replaced'), 2000);
+        }
+      }
+    });
+  });
+
+  $('match-count').innerHTML = `Replaced <span>${count}</span> occurrence${count!==1?'s':''}`;
+  showToast(`${count} replacements made`, 'success', 3000);
+  matchResults = [];
+});
+
+// ─── Table Detection ──────────────────────────────────
+$('btn-table').addEventListener('click', async () => {
+  $('table-panel').style.display = 'block';
+  await detectTables(state.currentPage);
+});
+
+async function detectTables(pageNum) {
+  const blocks = state.textBlocks[pageNum] || [];
+  if (!blocks.length) { showToast('No text blocks found on this page', 'warning'); return; }
+
+  // Heuristic: group blocks by proximity into a grid
+  // Sort by Y then X
+  const sorted = [...blocks].sort((a,b) => {
+    const rowDiff = Math.round(a.y/12) - Math.round(b.y/12);
+    return rowDiff !== 0 ? rowDiff : a.x - b.x;
+  });
+
+  // Group into rows (items within 8px vertical proximity)
+  const rows = [];
+  let curRow = [];
+  let lastY  = null;
+
+  sorted.forEach(b => {
+    if (lastY === null || Math.abs(b.y - lastY) < 16) {
+      curRow.push(b);
+    } else {
+      if (curRow.length) rows.push(curRow);
+      curRow = [b];
+    }
+    lastY = b.y;
+  });
+  if (curRow.length) rows.push(curRow);
+
+  // Find max columns
+  const maxCols = Math.max(...rows.map(r => r.length), 1);
+  const tableRows = rows.slice(0, Math.min(rows.length, 20));
+  const tableCols = Math.min(maxCols, 8);
+
+  // Build table data
+  state.tableData = tableRows.map(row => {
+    const cells = [];
+    for (let c = 0; c < tableCols; c++) {
+      cells.push(row[c] ? row[c].current : '');
+    }
+    return cells;
+  });
+
+  renderTableEditor(state.tableData);
+  showToast(`Detected ${tableRows.length}×${tableCols} table structure`, 'success');
+}
+
+function renderTableEditor(data) {
+  const tbl = $('table-grid');
+  tbl.innerHTML = '';
+  data.forEach((row, ri) => {
+    const tr = document.createElement('tr');
+    row.forEach((cell, ci) => {
+      const td = document.createElement('td');
+      td.contentEditable = 'true';
+      td.textContent = cell;
+      td.addEventListener('input', () => {
+        if (state.tableData[ri]) state.tableData[ri][ci] = td.textContent;
+      });
+      tr.appendChild(td);
+    });
+    tbl.appendChild(tr);
+  });
+}
+
+$('tbl-add-row').addEventListener('click', () => {
+  if (!state.tableData) return;
+  const cols = state.tableData[0]?.length || 1;
+  state.tableData.push(new Array(cols).fill(''));
+  renderTableEditor(state.tableData);
+});
+
+$('tbl-add-col').addEventListener('click', () => {
+  if (!state.tableData) return;
+  state.tableData.forEach(row => row.push(''));
+  renderTableEditor(state.tableData);
+});
+
+$('tbl-apply').addEventListener('click', () => {
+  // Push table data back to text blocks
+  if (!state.tableData) return;
+  const blocks = state.textBlocks[state.currentPage];
+  if (!blocks) return;
+  let idx = 0;
+  state.tableData.forEach(row => row.forEach(cell => {
+    if (blocks[idx]) { blocks[idx].current = cell; blocks[idx].modified = true; idx++; }
+  }));
+  renderOverlayBlocks(state.currentPage);
+  showToast('Table changes applied to document', 'success');
+});
+
+// ─── OCR ─────────────────────────────────────────────
+$('btn-ocr').addEventListener('click', () => {
+  $('ocr-panel').style.display = 'block';
+  showToast('OCR is ready. Click "Run OCR on This Page".', 'info', 3000);
+});
+
+$('ocr-run-btn').addEventListener('click', async () => {
+  $('ocr-progress-wrap').style.display = 'flex';
+  $('ocr-run-btn').disabled = true;
+  setStatus('Running OCR…', true);
+
+  try {
+    // Get the rendered canvas as image data
+    const imgData = canvas.toDataURL('image/png');
+
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => {
+        const pct = m.progress * 100;
+        const ring = $('ocr-ring');
+        const offset = 163 - (163 * pct / 100);
+        ring.style.strokeDashoffset = offset;
+        $('ocr-status').textContent = `${m.status} — ${Math.round(pct)}%`;
+      }
+    });
+
+    const { data } = await worker.recognize(imgData);
+    await worker.terminate();
+
+    // Build blocks from OCR words
+    const blocks = [];
+    const scaleW = canvas.width  / canvas.offsetWidth;
+    const scaleH = canvas.height / canvas.offsetHeight;
+
+    data.words.forEach(word => {
+      if (!word.text.trim()) return;
+      const b = word.bbox;
+      blocks.push({
+        orig: word.text,
+        current: word.text,
+        x: b.x0 * state.scale / scaleW,
+        y: b.y0 * state.scale / scaleH,
+        w: (b.x1 - b.x0) * state.scale / scaleW,
+        h: (b.y1 - b.y0) * state.scale / scaleH,
+        fontSize: Math.max((b.y1-b.y0) * state.scale / scaleH * 0.7, 8),
+        align: 'left',
+        color: '#000000',
+        el: null,
+        modified: false,
+        ocr: true,
+      });
+    });
+
+    state.textBlocks[state.currentPage] = blocks;
+    state.ocrMode = true;
+    renderOverlayBlocks(state.currentPage);
+
+    // Add OCR badge
+    const badge = document.createElement('div');
+    badge.className = 'ocr-badge';
+    badge.textContent = 'OCR';
+    pageWrapper.appendChild(badge);
+
+    $('ocr-progress-wrap').style.display = 'none';
+    setStatus(`OCR complete — ${blocks.length} words extracted`, false);
+    showToast(`OCR done! ${blocks.length} text blocks extracted`, 'success');
+    updateInfo();
+  } catch(err) {
+    showToast('OCR failed: ' + err.message, 'error', 5000);
+    setStatus('OCR error');
+    console.error(err);
+  } finally {
+    $('ocr-run-btn').disabled = false;
+  }
+});
+
+// ─── Export PDF ──────────────────────────────────────
+$('btn-download').addEventListener('click', () => exportPDF());
+
+async function exportPDF() {
+  if (!state.pdfLibDoc) return;
+  openModal('Exporting PDF…', 'Building your edited PDF…');
+
+  try {
+    const pdfDoc = state.pdfLibDoc;
+    const pages  = pdfDoc.getPages();
+
+    // Collect all modified pages
+    let modCount = 0;
+    for (const [pg, blocks] of Object.entries(state.textBlocks)) {
+      const pageIdx = parseInt(pg) - 1;
+      if (pageIdx < 0 || pageIdx >= pages.length) continue;
+      const pdfPage = pages[pageIdx];
+      const { width, height } = pdfPage.getSize();
+
+      // Get rendered scale ratio (canvas coords → PDF coords)
+      const renderedPage = await state.pdfDoc.getPage(parseInt(pg));
+      const vp = renderedPage.getViewport({ scale: state.scale });
+
+      const ratioX = width  / vp.width;
+      const ratioY = height / vp.height;
+
+      blocks.forEach(block => {
+        if (!block.modified) return;
+        modCount++;
+
+        // Cover original text with white rectangle
+        pdfPage.drawRectangle({
+          x: block.x * ratioX,
+          y: height - (block.y + block.h) * ratioY,
+          width: Math.max(block.w * ratioX, 1),
+          height: Math.max(block.h * ratioY, 1),
+          color: PDFLib.rgb(1, 1, 1),
+          opacity: 1,
+        });
+
+        // Parse color
+        let r=0,g=0,b=0;
+        const hex = block.color || '#000000';
+        r = parseInt(hex.slice(1,3),16)/255;
+        g = parseInt(hex.slice(3,5),16)/255;
+        b = parseInt(hex.slice(5,7),16)/255;
+
+        // Draw new text
+        const fontSize = Math.max((block.fontSize / state.scale) * ratioY * 0.85, 4);
+        try {
+          pdfPage.drawText(block.current || '', {
+            x: block.x * ratioX + 1,
+            y: height - (block.y + block.h * 0.85) * ratioY,
+            size: fontSize,
+            color: PDFLib.rgb(r, g, b),
+            maxWidth: block.w * ratioX,
+          });
+        } catch(e) { /* skip unsupported chars */ }
+      });
+    }
+
+    $('export-progress-text').textContent = `Processing ${modCount} modified text block${modCount!==1?'s':''}…`;
+    await sleep(100);
+
+    const bytes = await pdfDoc.save();
+    state.exportBytes = bytes;
+
+    $('export-progress-text').innerHTML =
+      `✓ Export complete!<br><span style="color:var(--text3);font-size:11px">${formatBytes(bytes.length)} · ${modCount} edits applied</span>`;
+    $('modal-actions').style.display = 'flex';
+    $('modal-title').textContent = 'Export Ready';
+    showToast('PDF exported successfully!', 'success');
+
+  } catch(err) {
+    closeModal();
+    showToast('Export failed: ' + err.message, 'error', 5000);
+    console.error(err);
+  }
+}
+
+$('modal-download-btn').addEventListener('click', () => {
+  if (!state.exportBytes) return;
+  const blob = new Blob([state.exportBytes], { type: 'application/pdf' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = state.fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeModal();
+  showToast(`Downloaded: ${state.fileName}`, 'success');
+});
+
+$('modal-close').addEventListener('click', closeModal);
+
+function openModal(title, body) {
+  $('modal-title').textContent = title;
+  $('export-progress-text').textContent = body;
+  $('modal-actions').style.display = 'none';
+  $('modal-backdrop').classList.add('open');
+}
+function closeModal() {
+  $('modal-backdrop').classList.remove('open');
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ─── Navigation ──────────────────────────────────────
+function gotoPage(n) {
+  n = Math.max(1, Math.min(state.totalPages, n));
+  if (n === state.currentPage) return;
+  state.currentPage = n;
+  renderPage(n);
+}
+
+$('prev-page').addEventListener('click', () => gotoPage(state.currentPage - 1));
+$('next-page').addEventListener('click', () => gotoPage(state.currentPage + 1));
+$('page-input').addEventListener('change', function() { gotoPage(parseInt(this.value)||1); });
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.contentEditable==='true') return;
+  if (e.key==='ArrowRight'||e.key==='ArrowDown') gotoPage(state.currentPage+1);
+  if (e.key==='ArrowLeft' ||e.key==='ArrowUp')   gotoPage(state.currentPage-1);
+  if (e.key==='e') $('btn-edit').click();
+});
+
+// ─── Zoom ────────────────────────────────────────────
+$('zoom-in').addEventListener('click',  () => setZoom(state.scale + 0.2));
+$('zoom-out').addEventListener('click', () => setZoom(state.scale - 0.2));
+
+function setZoom(s) {
+  state.scale = Math.max(0.4, Math.min(3.5, s));
+  $('zoom-val').textContent = Math.round(state.scale * 100 / 1.5) + '%';
+  // Clear block cache to force re-extract with new scale
+  delete state.textBlocks[state.currentPage];
+  if (state.pdfDoc) renderPage(state.currentPage);
+}
+
+// ─── File Upload ─────────────────────────────────────
+$('file-input').addEventListener('change', function() {
+  if (!this.files[0]) return;
+  const file = this.files[0];
+  const reader = new FileReader();
+  reader.onload = e => loadPDF(e.target.result, file.name);
+  reader.readAsArrayBuffer(file);
+  this.value = '';
+});
+
+// ─── Drag & Drop ─────────────────────────────────────
+const dropCard = $('drop-card');
+
+['dragenter','dragover'].forEach(ev => {
+  document.addEventListener(ev, e => {
+    e.preventDefault();
+    dropCard.classList.add('drag-over');
+  });
+});
+['dragleave','drop'].forEach(ev => {
+  document.addEventListener(ev, () => dropCard.classList.remove('drag-over'));
+});
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') {
+    const reader = new FileReader();
+    reader.onload = ev => loadPDF(ev.target.result, file.name);
+    reader.readAsArrayBuffer(file);
+  } else {
+    showToast('Please drop a PDF file', 'warning');
+  }
+});
+
+dropCard.addEventListener('click', () => $('file-input').click());
+
+// ─── Mouse position in status bar ───────────────────
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.round((e.clientX - rect.left) / state.scale * (canvas.width/rect.width));
+  const y = Math.round((e.clientY - rect.top)  / state.scale * (canvas.height/rect.height));
+  $('cursor-pos').style.display = 'flex';
+  $('status-pos').textContent = `${x}, ${y} px`;
+});
+canvas.addEventListener('mouseleave', () => {
+  $('cursor-pos').style.display = 'none';
+});
+
+// ─── Init ────────────────────────────────────────────
+setStatus('Ready — upload a PDF to begin');
+</script>
+</body>
+</html>
